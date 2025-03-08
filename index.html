@@ -11,6 +11,7 @@
         }
     }
     </script>
+    <script type="module" src="main.js"></script>
 </head>
 <body>
     <div class="container">
@@ -33,6 +34,21 @@
             </div>
             <button id="start-btn" class="control-btn">Start Listening</button>
             <button id="stop-btn" class="control-btn" disabled>Stop Listening</button>
+            
+            <div class="text-input-area">
+                <input type="text" id="text-input" placeholder="Type your message here..." />
+                <button id="send-text-btn" class="control-btn">Send</button>
+            </div>
+            
+            <div class="user-selection">
+                <label for="guest-user">Or use as guest: </label>
+                <select id="guest-user">
+                    <option value="Guest">Guest User</option>
+                    <option value="Guest1">Guest 1</option>
+                    <option value="Guest2">Guest 2</option>
+                    <option value="Guest3">Guest 3</option>
+                </select>
+            </div>
         </div>
         
         <div class="conversation-log">
@@ -40,8 +56,6 @@
             <div id="conversation-container"></div>
         </div>
     </div>
-
-    <script type="module" src="main.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

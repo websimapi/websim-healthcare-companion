@@ -178,6 +178,35 @@ body {
     border-left: 4px solid #4cc9f0;
 }
 
+.text-input-area {
+    display: flex;
+    width: 100%;
+    margin-top: 15px;
+}
+
+#text-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    margin-right: 10px;
+    font-size: 1rem;
+}
+
+.user-selection {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#guest-user {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-left: 10px;
+}
+
 @keyframes breathe {
     0%, 100% {
         transform: scale(1);
@@ -207,4 +236,3 @@ body {
         height: 150px;
     }
 }
-

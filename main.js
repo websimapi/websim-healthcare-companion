@@ -18,9 +18,12 @@ class HealthcareCompanion {
         this.statusMessage = document.getElementById('status-message');
         this.userIdentity = document.getElementById('user-identity');
         this.conversationContainer = document.getElementById('conversation-container');
+        this.textInput = document.getElementById('text-input');
+        this.sendTextBtn = document.getElementById('send-text-btn');
+        this.guestUserSelect = document.getElementById('guest-user');
         
         // State
-        this.currentUserId = "Unknown";
+        this.currentUserId = "Guest";
         this.isProcessing = false;
         
         // Initialize
@@ -29,14 +32,27 @@ class HealthcareCompanion {
     
     async init() {
         // Initialize services
-        await this.voiceDetection.init();
+        try {
+            await this.voiceDetection.init();
+        } catch (error) {
+            console.error("Error initializing voice detection:", error);
+            this.updateStatus("Voice recognition not available. You can still type your questions.");
+        }
         
         // Set up event listeners
         this.startBtn.addEventListener('click', () => this.startListening());
         this.stopBtn.addEventListener('click', () => this.stopListening());
+        this.sendTextBtn.addEventListener('click', () => this.processTextInput());
+        this.textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.processTextInput();
+        });
+        this.guestUserSelect.addEventListener('change', () => {
+            this.currentUserId = this.guestUserSelect.value;
+            this.userIdentity.textContent = `User: ${this.currentUserId}`;
+        });
         
         // Welcome message
-        this.updateStatus("I'm here to help you with healthcare and assistance. Please speak to me.");
+        this.updateStatus("I'm here to help you with healthcare and assistance. Please speak or type to me.");
         
         // Speak welcome
         setTimeout(() => {
@@ -52,12 +68,19 @@ class HealthcareCompanion {
         this.startBtn.disabled = true;
         this.stopBtn.disabled = false;
         
-        const success = await this.voiceDetection.startListening(
-            (transcript, userId) => this.processVoiceInput(transcript, userId)
-        );
-        
-        if (!success) {
-            this.updateStatus("Could not access microphone. Please check your permissions.");
+        try {
+            const success = await this.voiceDetection.startListening(
+                (transcript, userId) => this.processVoiceInput(transcript, userId)
+            );
+            
+            if (!success) {
+                this.updateStatus("Could not access microphone. Please check your permissions or type your questions instead.");
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+            }
+        } catch (error) {
+            console.error("Error starting voice detection:", error);
+            this.updateStatus("Could not access microphone. Please type your questions instead.");
             this.startBtn.disabled = false;
             this.stopBtn.disabled = true;
         }
@@ -74,7 +97,7 @@ class HealthcareCompanion {
         if (!transcript || this.isProcessing) return;
         
         this.isProcessing = true;
-        this.currentUserId = userId || "Unknown";
+        this.currentUserId = userId || "Guest";
         this.updateStatus("Processing your request...");
         
         // Update user identity display
@@ -93,7 +116,7 @@ class HealthcareCompanion {
             // Speak the response
             this.ttsService.speakLongText(response, () => {
                 this.isProcessing = false;
-                this.updateStatus("I'm here to help you. Please speak to me.");
+                this.updateStatus("I'm here to help you. Please speak or type to me.");
                 
                 // Re-enable listening if needed
                 this.startBtn.disabled = false;
@@ -102,7 +125,42 @@ class HealthcareCompanion {
             console.error("Error processing voice input:", error);
             this.isProcessing = false;
             this.updateStatus("Sorry, I encountered an error. Please try again.");
-            this.startBtn.disabled = false;
+            
+            // Add error message to conversation
+            this.addMessageToConversation("Sorry, I encountered an error. Please try again.", "bot");
+            this.ttsService.speak("Sorry, I encountered an error. Please try again.");
+        }
+    }
+    
+    async processTextInput() {
+        const text = this.textInput.value.trim();
+        if (!text || this.isProcessing) return;
+        
+        this.isProcessing = true;
+        this.updateStatus("Processing your request...");
+        
+        // Add user message to conversation
+        this.addMessageToConversation(text, "user");
+        
+        try {
+            // Get response from LLM
+            const response = await this.llmService.processUserInput(this.currentUserId, text);
+            
+            // Add bot response to conversation
+            this.addMessageToConversation(response, "bot");
+            
+            // Speak the response
+            this.ttsService.speakLongText(response, () => {
+                this.isProcessing = false;
+                this.updateStatus("I'm here to help you. Please speak or type to me.");
+            });
+            
+            // Clear the text input
+            this.textInput.value = '';
+        } catch (error) {
+            console.error("Error processing text input:", error);
+            this.isProcessing = false;
+            this.updateStatus("Sorry, I encountered an error. Please try again.");
             
             // Add error message to conversation
             this.addMessageToConversation("Sorry, I encountered an error. Please try again.", "bot");
@@ -128,4 +186,3 @@ class HealthcareCompanion {
 document.addEventListener('DOMContentLoaded', () => {
     window.healthcareCompanion = new HealthcareCompanion();
 });
-

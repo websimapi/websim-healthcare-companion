@@ -28,7 +28,17 @@ class VoiceDetection {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 2048;
-            this.pitchDetector = pitchfinder.YIN();
+            
+            // Use pitchfinder if available, but make it optional
+            try {
+                this.pitchDetector = pitchfinder.YIN();
+            } catch (error) {
+                console.warn("Pitchfinder not available, using fallback detection:", error);
+                // Simple fallback for pitch detection
+                this.pitchDetector = (buffer) => {
+                    return 200; // Default pitch value as fallback
+                };
+            }
             
             // Load stored user voice profiles
             this.loadUserProfiles();
@@ -60,37 +70,67 @@ class VoiceDetection {
             this.microphone = this.audioContext.createMediaStreamSource(stream);
             this.microphone.connect(this.analyser);
             
-            // Set up speech recognition
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this.recognition = new SpeechRecognition();
-            this.recognition.continuous = true;
-            this.recognition.interimResults = true;
-            
-            this.recognition.onresult = (event) => {
-                let interimTranscript = '';
+            // Set up speech recognition (with error handling)
+            try {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    throw new Error("Speech recognition not supported");
+                }
                 
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
+                this.recognition = new SpeechRecognition();
+                this.recognition.continuous = true;
+                this.recognition.interimResults = true;
+                
+                this.recognition.onresult = (event) => {
+                    let interimTranscript = '';
                     
-                    if (event.results[i].isFinal) {
-                        this.transcript += transcript + ' ';
-                        this.resetSpeechTimeout();
-                    } else {
-                        interimTranscript += transcript;
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        
+                        if (event.results[i].isFinal) {
+                            this.transcript += transcript + ' ';
+                            this.resetSpeechTimeout();
+                        } else {
+                            interimTranscript += transcript;
+                        }
                     }
-                }
+                    
+                    // Update status to show what's being heard
+                    document.getElementById('status-message').textContent = "Hearing: " + (this.transcript + interimTranscript);
+                };
                 
-                // Update status to show what's being heard
-                document.getElementById('status-message').textContent = "Hearing: " + (this.transcript + interimTranscript);
-            };
-            
-            this.recognition.onend = () => {
-                if (this.isRecording) {
-                    this.recognition.start();
-                }
-            };
-            
-            this.recognition.start();
+                this.recognition.onend = () => {
+                    if (this.isRecording) {
+                        this.recognition.start();
+                    }
+                };
+                
+                this.recognition.onerror = (event) => {
+                    console.error("Speech recognition error", event);
+                    if (this.isRecording && this.onSpeechEnd) {
+                        // If there's an error but we have some transcript, still use it
+                        if (this.transcript.trim() !== '') {
+                            this.onSpeechEnd(this.transcript.trim(), this.voiceData.userIdentified);
+                        }
+                        this.stopListening();
+                    }
+                };
+                
+                this.recognition.start();
+            } catch (error) {
+                console.warn("Speech recognition not supported:", error);
+                // Set a timer to simulate speech recognition
+                this.speechSimTimer = setInterval(() => {
+                    if (this.isRecording) {
+                        const average = this.detectAudioLevel();
+                        if (average > this.silenceThreshold * 3) {
+                            document.getElementById('status-message').textContent = "Hearing audio but can't transcribe (speech recognition not available)";
+                        }
+                    } else {
+                        clearInterval(this.speechSimTimer);
+                    }
+                }, 500);
+            }
             
             // Set up pitch detection
             this.isRecording = true;
@@ -100,13 +140,17 @@ class VoiceDetection {
             this.transcript = "";
             
             // Start media recording for more detailed audio analysis
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.recordedChunks.push(event.data);
-                }
-            };
-            this.mediaRecorder.start();
+            try {
+                this.mediaRecorder = new MediaRecorder(stream);
+                this.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        this.recordedChunks.push(event.data);
+                    }
+                };
+                this.mediaRecorder.start();
+            } catch (error) {
+                console.warn("MediaRecorder not available:", error);
+            }
             
             // Begin analyzing audio
             this.analyzePitch();
@@ -260,7 +304,19 @@ class VoiceDetection {
         
         return this.voiceData.userIdentified;
     }
+
+    detectAudioLevel() {
+        const bufferLength = this.analyser.fftSize;
+        const buffer = new Float32Array(bufferLength);
+        this.analyser.getFloatTimeDomainData(buffer);
+        
+        // Calculate audio level
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+            sum += Math.abs(buffer[i]);
+        }
+        return sum / bufferLength;
+    }
 }
 
 export default VoiceDetection;
-

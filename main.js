@@ -33,7 +33,10 @@ class HealthcareCompanion {
     async init() {
         // Initialize services
         try {
-            await this.voiceDetection.init();
+            const voiceInitResult = await this.voiceDetection.init();
+            if (!voiceInitResult) {
+                throw new Error("Voice detection initialization failed");
+            }
         } catch (error) {
             console.error("Error initializing voice detection:", error);
             this.updateStatus("Voice recognition not available. You can still type your questions.");
@@ -63,6 +66,12 @@ class HealthcareCompanion {
     
     async startListening() {
         if (this.isProcessing) return;
+        
+        // Resume audio context if it was suspended
+        if (this.voiceDetection.audioContext && 
+            this.voiceDetection.audioContext.state === "suspended") {
+            await this.voiceDetection.audioContext.resume();
+        }
         
         this.updateStatus("Listening...");
         this.startBtn.disabled = true;
@@ -183,6 +192,6 @@ class HealthcareCompanion {
 }
 
 // Initialize when the page is loaded
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', () => {
     window.healthcareCompanion = new HealthcareCompanion();
 });
